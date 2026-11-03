@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocMind �?把你�?PDF 变成能引用的问答知识�?/title>
+<meta name="description" content="上传财报或论文，提问后返回带页码引用的答案，并记住你的关注点�?>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #16181d;
+    --ink-soft: #4a5160;
+    --ink-faint: #7a828f;
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --line: #dcdcd6;
+    --accent: #1f5f4a;
+    --accent-soft: #e6efe9;
+    --code-bg: #eef0ef;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 1.25rem 3rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+          "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  }
+
+  main { max-width: 960px; margin: 0 auto; }
+
+  section { padding: 3.25rem 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+
+  .kicker {
+    display: block;
+    margin: 0 0 .35rem;
+    font-size: .78rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 { margin: 0 0 .5rem; font-size: clamp(2.4rem, 7vw, 3.4rem); letter-spacing: -.02em; line-height: 1.1; }
+  h2 { margin: 0 0 1.4rem; font-size: 1.55rem; letter-spacing: -.01em; }
+  h3 { margin: 0 0 .4rem; font-size: 1.02rem; }
+  p { margin: 0 0 1rem; }
+
+  .lede { font-size: 1.2rem; color: var(--ink); margin: 0 0 .6rem; font-weight: 600; }
+  .onesentence { color: var(--ink-soft); margin: 0 0 1.9rem; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .btn {
+    display: inline-block;
+    padding: .7rem 1.4rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .btn:hover { background: #174938; }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.ghost:hover { background: var(--accent-soft); }
+  .en { display: block; font-size: .74rem; font-weight: 500; opacity: .72; letter-spacing: .06em; }
+  .fineprint { margin: .9rem 0 0; font-size: .82rem; color: var(--ink-faint); }
+
+  /* �?解决的问�?*/
+  .pains { list-style: none; margin: 0 0 1.6rem; padding: 0; }
+  .pains li {
+    display: flex;
+    gap: .9rem;
+    padding: .9rem 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .pains li:last-child { border-bottom: 0; }
+  .pains .num {
+    flex: none;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: .85rem;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+  .value {
+    margin: 0;
+    padding: 1rem 1.2rem;
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 10px 10px 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+
+  /* �?核心功能 */
+  .cards {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .cards li {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.15rem 1.2rem 1.25rem;
+  }
+  .cards p { margin: 0; color: var(--ink-soft); font-size: .93rem; }
+  .cards .tag {
+    display: inline-block;
+    margin-bottom: .55rem;
+    padding: .12rem .55rem;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font: 600 .78rem/1.7 ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+
+  /* �?实测数据 */
+  pre {
+    margin: 0;
+    padding: 1.15rem 1.25rem;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow-x: auto;
+    font: .88rem/1.75 ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+    color: #22262c;
+  }
+  .note {
+    display: inline-block;
+    margin: 0 0 .9rem;
+    padding: .25rem .7rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-faint);
+    font-size: .8rem;
+  }
+
+  /* �?演示与体�?*/
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: .5rem .35rem;
+    list-style: none;
+    margin: 0 0 1.8rem;
+    padding: 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .flow li { display: flex; align-items: center; gap: .35rem; }
+  .flow li:not(:last-child)::after {
+    content: "";
+    width: 0;
+    height: 0;
+    margin-left: .1rem;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 7px solid var(--accent);
+  }
+  .flow .node {
+    padding: .6rem .85rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    text-align: center;
+  }
+  .flow .node b { display: block; font-size: .92rem; }
+  .flow .node span { display: block; font-size: .72rem; color: var(--ink-faint); letter-spacing: .04em; }
+  .flow .node.hl { background: var(--accent-soft); border-color: var(--accent); }
+
+  .ways {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .ways > div {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem;
+  }
+  .ways p { margin: 0; color: var(--ink-soft); font-size: .93rem; }
+  .ways code {
+    display: block;
+    margin-top: .6rem;
+    padding: .6rem .7rem;
+    background: var(--code-bg);
+    border-radius: 8px;
+    font: .84rem/1.7 ui-monospace, "Cascadia Code", Consolas, monospace;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  a { color: var(--accent); }
+
+  /* �?页脚 */
+  footer {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 0 0;
+    border-top: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-size: .86rem;
+  }
+  footer p { margin: 0 0 .35rem; }
+  footer .stack { color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- �?Hero -->
+  <section id="hero">
+    <span class="kicker">PDF Knowledge Base</span>
+    <h1>DocMind</h1>
+    <p class="lede">把你�?PDF 变成能引用的问答知识�?/p>
+    <p class="onesentence">上传财报或论文，提问后返回带页码引用的答案，并记住你的关注点�?/p>
+    <div class="actions">
+      <a class="btn" href="#quickstart">体验入口<span class="en">Try the API</span></a>
+      <!-- TODO 评审前替换为真实仓库地址 -->
+      <a class="btn ghost" href="https://github.com/Lete686/docmind">代码仓库<span class="en">Source on GitHub</span></a>
+    </div>
+    <p class="fineprint">在线体验需先启动服务，详见下方「本地运行」�?/p>
+  </section>
+
+  <!-- �?解决的问�?-->
+  <section id="problem">
+    <span class="kicker">The Problem</span>
+    <h2>解决的问�?/h2>
+    <ol class="pains">
+      <li><span class="num">1</span><span>200 页财报里�?2022 年资本开�?，要翻目录、跳页、来回比对�?/span></li>
+      <li><span class="num">2</span><span>找到了答案却无法确认出处，不敢直接引用�?/span></li>
+      <li><span class="num">3</span><span>每次都要重新提问，助手并不记得你关心哪些指标�?/span></li>
+    </ol>
+    <p class="value">答案 + 精确页码 + 记忆延续</p>
+  </section>
+
+  <!-- �?核心功能 -->
+  <section id="features">
+    <span class="kicker">Core Features</span>
+    <h2>核心功能</h2>
+    <ul class="cards">
+      <li>
+        <span class="tag">Full-page parsing</span>
+        <h3>全页解析</h3>
+        <p>pypdf 逐页抽取�?03 �?/ 0 跳过�?/p>
+      </li>
+      <li>
+        <span class="tag">Page-level retrieval</span>
+        <h3>页级检�?/h3>
+        <p>每页一�?pdf-page 记忆，检索命中即定位到页�?/p>
+      </li>
+      <li>
+        <span class="tag">Page citations</span>
+        <h3>页码引用</h3>
+        <p>答案来自原文片段，引用可回查（示例：PEPSICO_2022_10K p71）�?/p>
+      </li>
+      <li>
+        <span class="tag">Memory reuse</span>
+        <h3>记忆复用</h3>
+        <p>记住用户偏好，下次提问自动拼入检索词�?/p>
+      </li>
+    </ul>
+  </section>
+
+  <!-- �?实测数据 -->
+  <section id="metrics">
+    <span class="kicker">Measured Results</span>
+    <h2>实测数据</h2>
+    <span class="note">以下为真机实测，非预期�?/span>
+<pre>解析 503 �?�?503 块，0 跳过，写入耗时 38.4s
+
+提问 "What was PepsiCo net revenue in 2022?"
+  �?Net revenue $ 86,392 $ 79,474 9 %
+  �?引用 p71 (score 0.0164) / p40 / p74 / p41 / p70
+
+写入偏好后提�?"What changed in 2022?"
+  �?expanded_query = 原问�?+ 偏好文本
+  �?命中收敛�?p40</pre>
+  </section>
+
+  <!-- �?演示与体�?-->
+  <section id="demo">
+    <a id="quickstart"></a>
+    <span class="kicker">Demo &amp; Experience</span>
+    <h2>演示与体�?/h2>
+
+    <ol class="flow">
+      <li><span class="node"><b>PDF</b><span>Source</span></span></li>
+      <li><span class="node"><b>解析</b><span>pypdf</span></span></li>
+      <li><span class="node hl"><b>PowerContext</b><span>Memory store</span></span></li>
+      <li><span class="node"><b>检�?/b><span>FTS search</span></span></li>
+      <li><span class="node"><b>引用</b><span>Page citation</span></span></li>
+    </ol>
+
+    <div class="ways">
+      <div>
+        <h3>在线体验 <span class="en">Try online</span></h3>
+        <p>服务启动后打开 <a href="/docs">/docs</a>，按 <code style="display:inline;padding:.1rem .4rem;margin:0">POST /ingest</code> 上传 PDF，再�?<code style="display:inline;padding:.1rem .4rem;margin:0">POST /ask</code> 提问即可看到带页码的引用�?/p>
+      </div>
+      <div>
+        <h3>本地运行 <span class="en">Run locally</span></h3>
+        <p>依赖 Python 3.11+ 与一个可访问�?PowerContext 实例，三步起服务�?/p>
+        <code>pip install -e .
+cp .env.example .env
+bash scripts/run.sh</code>
+        <p style="margin-top:.7rem">完整说明�?<a href="README.md#快速开�?>README.md#快速开�?/a>，细节与限制�?<a href="VERIFY.md">VERIFY.md</a>�?/p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- �?页脚 -->
+<footer>
+  <p class="stack">技术栈：Qoder · PowerContext 1.4.1 · FastAPI · pypdf</p>
+  <p>细节与限制见 <a href="VERIFY.md">VERIFY.md</a>�?/p>
+  <p>© 2026 DocMind</p>
+</footer>
+</body>
+</html>

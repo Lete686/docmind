@@ -1,0 +1,13 @@
+.env
+# 入库幂等台账与提问日志，属于本地运行状态；要跨机器共享就删掉这两行
+samples/manifest.json
+samples/queries.log
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
