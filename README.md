@@ -4,12 +4,41 @@
 
 要求 Python 3.11+。
 
+## 0. 先启动 PowerContext（一次性）
+
+本项目依赖一个运行中的 PowerContext 实例。若本机尚未安装：
+
+```bash
+uv tool install --force "powercontext[cli,server]==1.4.1"
+export PATH="$HOME/.local/bin:$PATH"
+powercontext server run --host 127.0.0.1 --port 8787 --role all
+```
+
+该命令前台阻塞，请保留此终端；后面的健康检查、建 scope 以及启动 DocMind 都另开一个终端执行。
+
+启动约 20 秒，确认健康：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8787/health/live   # 期望 200
+```
+
+创建文档 scope（幂等键固定，可重复执行）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/v1/scopes -H "Content-Type: application/json" \
+  -d '{"title":"DocMind Demo","summary":"PDF page evidence Q&A","idempotency_key":"docmind-demo-v1"}'
+```
+
+把返回的 `scope_id` 填进 `.env` 的 `POWERCONTEXT_SCOPE`，再继续下面的「快速开始」。
+
+注意：PowerContext 首次启动会初始化 SQLite；不要与其它重任务并发（4 核机器上并发时检索会从 0.06s 退化到十余秒）。
+
 ## 快速开始
 
 ```bash
 pip install -e .
 cp .env.example .env      # 填 POWERCONTEXT_URL 与 POWERCONTEXT_SCOPE
-bash scripts/run.sh       # http://127.0.0.1:8000 ，首页即项目介绍，/docs 可试接口
+bash scripts/run.sh       # 另开终端执行（前台运行）：http://127.0.0.1:8000 ，首页即项目介绍，/docs 可试接口
 ```
 
 下面是分步说明。
@@ -26,9 +55,9 @@ cp .env.example .env               # 编辑 .env，填 POWERCONTEXT_URL 与 POWE
 
 依赖：`fastapi`、`uvicorn[standard]`、`pypdf`、`httpx`（见 `pyproject.toml`）。
 
-## 2. 启动 PowerContext
+## 2. 配置环境变量
 
-docmind 不内置任何地址或凭据，取值只能来自环境：
+具体的安装、启动与 scope 创建命令见上方「0. 先启动 PowerContext」。docmind 不内置任何地址或凭据，取值只能来自环境：
 
 | 变量 | 必填 | 用途 |
 |---|---|---|
@@ -36,12 +65,11 @@ docmind 不内置任何地址或凭据，取值只能来自环境：
 | `POWERCONTEXT_SCOPE` | 是 | 文档记忆的 `scope_id`，一个知识库一个值（`/ingest` 写入、`/ask` 检索都用它） |
 | `POWERCONTEXT_MEMORY_SCOPE` | 否 | 用户偏好的 `scope_id`。留空则启动时自动创建（见下方 `/memory` 行为） |
 
-1. 用你自己的方式把 PowerContext 跑起来，记下监听地址。
-2. 把地址和 scope 写进 `.env`，例如 `POWERCONTEXT_URL=http://127.0.0.1:8787`、`POWERCONTEXT_SCOPE=docmind`。
-3. 需要鉴权时把 token 也放环境变量（`.env.example` 里预留了 `POWERCONTEXT_TOKEN`），不要写进代码，也不要提交 `.env`。
-4. docmind 会用到四个上游端点，确认它们可达后再启动：`POST /v1/scopes`（建偏好 scope）、`POST /v1/memory/remember`（入库与写偏好）、`POST /v1/memory/search`（检索）、`POST /v1/memory/entries/list`（读偏好）。
+另外三条与环境表本身无关、但必须遵守的约定：
 
-注意：客户端固定直连 `POWERCONTEXT_URL`（`trust_env=False`）。本机开着系统代理时，代理常会把发往 `127.0.0.1` 的请求接走并返回空 body 的 502，这里显式绕开。
+- 需要鉴权时把 token 也放环境变量（`.env.example` 里预留了 `POWERCONTEXT_TOKEN`），不要写进代码，也不要提交 `.env`。
+- docmind 依赖四个上游端点：`POST /v1/scopes`（建偏好 scope）、`POST /v1/memory/remember`（入库与写偏好）、`POST /v1/memory/search`（检索）、`POST /v1/memory/entries/list`（读偏好）。
+- 客户端固定直连 `POWERCONTEXT_URL`（`trust_env=False`）：本机开着系统代理时，代理常会把发往 `127.0.0.1` 的请求接走并返回空 body 的 502，这里显式绕开。
 
 ## 3. 启动本服务
 
